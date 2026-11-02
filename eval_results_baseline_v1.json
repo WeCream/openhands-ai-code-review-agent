@@ -1,0 +1,240 @@
+{
+  "model": "deepseek-chat",
+  "dataset": "D:\\CodeReviewAgent\\samples\\eval_cases.json",
+  "metrics_definition": "TP/FN/FP/TN are case-level metrics: a case is detected if the model returns at least one finding. Evidence pass rate is finding-level.",
+  "metrics": {
+    "case_count": 10,
+    "TP": 6,
+    "FN": 0,
+    "FP": 0,
+    "TN": 4,
+    "recall": 1.0,
+    "precision": 1.0,
+    "false_positive_rate": 0.0,
+    "accuracy": 1.0,
+    "finding_count": 7,
+    "valid_finding_count": 7,
+    "evidence_pass_rate": 1.0
+  },
+  "cases": [
+    {
+      "id": "BUG-01",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "除法前没有检查除数是否为零",
+      "detected": true,
+      "case_outcome": "TP",
+      "finding_count": 1,
+      "valid_finding_count": 1,
+      "invalid_finding_count": 0,
+      "summary": "新增的 divide 函数直接执行 a / b，未处理除数为零的情况，可能抛出 ZeroDivisionError；也未校验输入类型。由于是新增代码，建议补充防御性处理。",
+      "findings": [
+        {
+          "title": "除数为零时抛出未处理的 ZeroDivisionError",
+          "severity": "medium",
+          "file_path": "division.py",
+          "line": 2,
+          "description": "divide 函数直接执行 a / b，当 b 为 0 时会抛出 ZeroDivisionError，调用方若未捕获会导致程序异常终止。该函数作为通用除法工具，应在入口处显式处理除零情况或明确抛出更清晰的异常。",
+          "evidence": "    return a / b",
+          "suggestion": "在除法前检查 b 是否为 0，例如 if b == 0: raise ValueError(\"除数不能为零\")，或根据业务需求返回特定值，并在文档中说明。"
+        }
+      ],
+      "invalid_findings": [],
+      "elapsed_seconds": 2.016
+    },
+    {
+      "id": "BUG-02",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "直接按外部传入的索引访问列表，可能越界",
+      "detected": true,
+      "case_outcome": "TP",
+      "finding_count": 1,
+      "valid_finding_count": 1,
+      "invalid_finding_count": 0,
+      "summary": "新增代码存在越界访问风险：get_item 直接使用传入索引访问列表，而调用处传入索引 5，列表长度仅为 2，运行时会抛出 IndexError。",
+      "findings": [
+        {
+          "title": "列表索引越界导致运行时异常",
+          "severity": "high",
+          "file_path": "items.py",
+          "line": 5,
+          "description": "items 列表只有 2 个元素（有效索引为 0 和 1），但调用 get_item(items, 5) 传入索引 5，get_item 内部直接执行 items[index]，会抛出 IndexError 导致程序崩溃。",
+          "evidence": "print(get_item(items, 5))",
+          "suggestion": "使用合法索引（如 0 或 1），或在 get_item 中增加边界检查并返回默认值/抛出更明确的异常。"
+        }
+      ],
+      "invalid_findings": [],
+      "elapsed_seconds": 1.663
+    },
+    {
+      "id": "BUG-03",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "没有检查 user 是否为 None 就访问其属性",
+      "detected": true,
+      "case_outcome": "TP",
+      "finding_count": 1,
+      "valid_finding_count": 1,
+      "invalid_finding_count": 0,
+      "summary": "本次新增的 get_username 函数直接访问 user.name，未做空值或属性存在性校验，存在潜在运行时错误风险。",
+      "findings": [
+        {
+          "title": "未校验 user 为空或缺少 name 属性",
+          "severity": "medium",
+          "file_path": "profile.py",
+          "line": 2,
+          "description": "函数直接访问 user.name，若调用方传入 None 或没有 name 属性的对象，会抛出 AttributeError，导致程序异常。",
+          "evidence": "    return user.name",
+          "suggestion": "在访问前增加校验，例如 if user is None: 返回默认值或抛出明确异常；或使用 getattr(user, 'name', None) 并处理缺失情况。"
+        }
+      ],
+      "invalid_findings": [],
+      "elapsed_seconds": 1.57
+    },
+    {
+      "id": "BUG-04",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "打开文件后没有显式关闭资源",
+      "detected": true,
+      "case_outcome": "TP",
+      "finding_count": 2,
+      "valid_finding_count": 2,
+      "invalid_finding_count": 0,
+      "summary": "新增的 read_text 函数使用 open(path).read() 读取文件，未指定编码且未关闭文件句柄，存在资源泄漏和编码不一致风险。",
+      "findings": [
+        {
+          "title": "文件句柄未关闭导致资源泄漏",
+          "severity": "medium",
+          "file_path": "reader.py",
+          "line": 2,
+          "description": "open(path).read() 返回的文件对象没有显式关闭，也没有使用 with 语句。在 CPython 中依赖引用计数可能及时回收，但在其他实现或异常路径下文件描述符可能泄漏，长期运行会耗尽句柄。",
+          "evidence": "return open(path).read()",
+          "suggestion": "使用 with open(path, encoding='utf-8') as f: return f.read()，确保文件在读取后关闭。"
+        },
+        {
+          "title": "未指定编码，依赖平台默认编码",
+          "severity": "low",
+          "file_path": "reader.py",
+          "line": 2,
+          "description": "open 未指定 encoding，读取结果依赖运行环境的默认编码（如 Windows 上可能是 cp1252），可能导致跨平台读取文本时出现乱码或 UnicodeDecodeError。",
+          "evidence": "return open(path).read()",
+          "suggestion": "显式指定 encoding 参数，例如 open(path, encoding='utf-8')。"
+        }
+      ],
+      "invalid_findings": [],
+      "elapsed_seconds": 1.996
+    },
+    {
+      "id": "SEC-01",
+      "category": "security",
+      "expected_issue": true,
+      "expected_issue_description": "将用户输入直接拼接到 SQL 语句中，存在 SQL 注入风险",
+      "detected": true,
+      "case_outcome": "TP",
+      "finding_count": 1,
+      "valid_finding_count": 1,
+      "invalid_finding_count": 0,
+      "summary": "本次修改新增了 find_user 函数，但直接拼接用户输入构造 SQL 查询，存在明确的 SQL 注入风险，属于高危安全问题。",
+      "findings": [
+        {
+          "title": "SQL 注入漏洞",
+          "severity": "critical",
+          "file_path": "users.py",
+          "line": 2,
+          "description": "find_user 函数将 username 参数直接拼接到 SQL 语句中，未做任何转义或参数化处理。攻击者可构造恶意 username（如 ' OR '1'='1）绕过查询条件，导致数据泄露或篡改。",
+          "evidence": "cursor.execute(\"SELECT * FROM users WHERE name = '\" + username + \"'\")",
+          "suggestion": "使用参数化查询，例如 cursor.execute(\"SELECT * FROM users WHERE name = %s\", (username,))（具体占位符依数据库驱动而定），避免字符串拼接。"
+        }
+      ],
+      "invalid_findings": [],
+      "elapsed_seconds": 1.702
+    },
+    {
+      "id": "SEC-02",
+      "category": "security",
+      "expected_issue": true,
+      "expected_issue_description": "可能将敏感认证令牌写入日志",
+      "detected": true,
+      "case_outcome": "TP",
+      "finding_count": 1,
+      "valid_finding_count": 1,
+      "invalid_finding_count": 0,
+      "summary": "新增的 log_token 函数将登录令牌以明文写入日志，存在敏感信息泄露风险。",
+      "findings": [
+        {
+          "title": "登录令牌被明文写入日志",
+          "severity": "high",
+          "file_path": "auth.py",
+          "line": 2,
+          "description": "该函数将完整的登录 token 直接记录到 info 级别日志中。日志通常会被持久化、集中收集或转发到第三方系统，任何能访问日志的人都可以获取有效令牌并冒用用户身份，属于敏感凭据泄露。",
+          "evidence": "logger.info(\"Login token: %s\", token)",
+          "suggestion": "不要在日志中记录完整令牌；如需排查问题，可仅记录令牌的哈希前缀或脱敏后的片段（如 token[:4] + '***'），或改为记录用户标识、会话 ID 等非敏感信息。"
+        }
+      ],
+      "invalid_findings": [],
+      "elapsed_seconds": 1.95
+    },
+    {
+      "id": "CLEAN-01",
+      "category": "clean",
+      "expected_issue": false,
+      "expected_issue_description": "仅将变量名称改为更清晰的名称，不应报告实质性问题",
+      "detected": false,
+      "case_outcome": "TN",
+      "finding_count": 0,
+      "valid_finding_count": 0,
+      "invalid_finding_count": 0,
+      "summary": "本次修改仅重命名了函数及其参数，逻辑保持不变，未发现明确的 Bug、安全风险或可维护性问题。",
+      "findings": [],
+      "invalid_findings": [],
+      "elapsed_seconds": 0.969
+    },
+    {
+      "id": "CLEAN-02",
+      "category": "clean",
+      "expected_issue": false,
+      "expected_issue_description": "新增普通注释，不应报告实质性问题",
+      "detected": false,
+      "case_outcome": "TN",
+      "finding_count": 0,
+      "valid_finding_count": 0,
+      "invalid_finding_count": 0,
+      "summary": "本次修改新增了一个简单的 add 函数，实现正确，未发现会导致程序错误、安全风险或明显可维护性问题。",
+      "findings": [],
+      "invalid_findings": [],
+      "elapsed_seconds": 0.726
+    },
+    {
+      "id": "EDGE-01",
+      "category": "edge",
+      "expected_issue": false,
+      "expected_issue_description": "只调整运算表达式的空格，不应报告实质性问题",
+      "detected": false,
+      "case_outcome": "TN",
+      "finding_count": 0,
+      "valid_finding_count": 0,
+      "invalid_finding_count": 0,
+      "summary": "本次修改仅调整了赋值语句的空白格式，未改变逻辑，未发现 Bug、安全风险或可维护性问题。",
+      "findings": [],
+      "invalid_findings": [],
+      "elapsed_seconds": 1.089
+    },
+    {
+      "id": "EDGE-02",
+      "category": "edge",
+      "expected_issue": false,
+      "expected_issue_description": "已经显式检查除数为零，不应报告未处理除零的问题",
+      "detected": false,
+      "case_outcome": "TN",
+      "finding_count": 0,
+      "valid_finding_count": 0,
+      "invalid_finding_count": 0,
+      "summary": "本次修改新增了一个简单的安全除法函数，先检查除数为零再执行除法，未发现明确的 Bug、安全风险或可维护性问题。",
+      "findings": [],
+      "invalid_findings": [],
+      "elapsed_seconds": 0.864
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+﻿import unittest
+
+from src.evidence_validator import (
+    ValidationIssue,
+    ValidationResult,
+)
+from src.report import generate_markdown_report
+from src.schemas import ReviewFinding, ReviewResult
+
+
+class TestMarkdownReport(unittest.TestCase):
+    def setUp(self):
+        self.valid_finding = ReviewFinding(
+            title="Potential division by zero",
+            severity="low",
+            issue_type="division_by_zero",
+            file_path="example.py",
+            line=2,
+            description="The divisor may be zero.",
+            evidence="return a / b",
+            suggestion="Check whether b is zero before dividing.",
+        )
+
+        self.invalid_finding = ReviewFinding(
+            title="Finding with invalid line",
+            severity="medium",
+            issue_type="division_by_zero",
+            file_path="example.py",
+            line=99,
+            description="This finding points to a nonexistent line.",
+            evidence="imaginary_code()",
+            suggestion="Verify the reported line and evidence.",
+        )
+
+        self.review_result = ReviewResult(
+            summary="The review found two potential issues.",
+            findings=[self.valid_finding, self.invalid_finding],
+        )
+
+        self.validation_result = ValidationResult(
+            valid_findings=[self.valid_finding],
+            invalid_findings=[
+                ValidationIssue(
+                    finding=self.invalid_finding,
+                    reason="Line 99 is not an added line in example.py",
+                )
+            ],
+        )
+
+    def test_report_contains_summary_and_counts(self):
+        report = generate_markdown_report(
+            self.review_result,
+            self.validation_result,
+        )
+
+        self.assertIn("# Code Review Report", report)
+        self.assertIn("The review found two potential issues.", report)
+        self.assertIn("**发现总数：** 2", report)
+        self.assertIn("**通过证据校验：** 1", report)
+        self.assertIn("**未通过证据校验：** 1", report)
+
+    def test_report_contains_valid_finding_details(self):
+        report = generate_markdown_report(
+            self.review_result,
+            self.validation_result,
+        )
+
+        self.assertIn("Potential division by zero", report)
+        self.assertIn("example.py:2", report)
+        self.assertIn("return a / b", report)
+        self.assertIn("Check whether b is zero before dividing.", report)
+
+    def test_report_separates_invalid_findings(self):
+        report = generate_markdown_report(
+            self.review_result,
+            self.validation_result,
+        )
+
+        invalid_section = report.split(
+            "## 3. 未通过证据校验的问题",
+            maxsplit=1,
+        )[1]
+
+        self.assertIn("Finding with invalid line", invalid_section)
+        self.assertIn(
+            "Line 99 is not an added line in example.py",
+            invalid_section,
+        )
+
+    def test_report_handles_no_findings(self):
+        empty_result = ReviewResult(
+            summary="No potential issues were found.",
+            findings=[],
+        )
+        empty_validation = ValidationResult(
+            valid_findings=[],
+            invalid_findings=[],
+        )
+
+        report = generate_markdown_report(
+            empty_result,
+            empty_validation,
+        )
+
+        self.assertIn("**发现总数：** 0", report)
+        self.assertIn("No potential issues were found.", report)
+        self.assertIn("暂无通过证据校验的问题。", report)
+        self.assertIn("暂无未通过证据校验的问题。", report)
+
+
+if __name__ == "__main__":
+    unittest.main()

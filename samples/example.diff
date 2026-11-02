@@ -1,0 +1,9 @@
+diff --git a/example.py b/example.py
+--- a/example.py
++++ b/example.py
+@@ -0,0 +1,5 @@
++def divide(a, b):
++    result = a / b
++    return result
++
++print(divide(10, 0))

@@ -1,0 +1,248 @@
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+from src.evidence_validator import validate_review
+from src.metrics import calculate_metrics
+from src.reviewer import DeepSeekReviewer, ReviewError
+
+
+PROJECT_DIR = Path(__file__).resolve().parent
+DEFAULT_DATASET = PROJECT_DIR / "samples" / "eval_cases.json"
+DEFAULT_OUTPUT = PROJECT_DIR / "eval_results.json"
+
+
+def load_dataset(dataset_path: Path) -> list[dict]:
+    """读取并检查评测数据集。"""
+
+    try:
+        data = json.loads(dataset_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"无法读取评测集：{exc}") from exc
+
+    cases = data.get("cases") if isinstance(data, dict) else None
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("评测集必须包含非空的 cases 数组。")
+
+    seen_ids = set()
+
+    for case in cases:
+        if not isinstance(case, dict):
+            raise ValueError("每个评测案例都必须是 JSON 对象。")
+
+        case_id = case.get("id")
+        diff = case.get("diff")
+        expected_issue = case.get("expected_issue")
+
+        if not isinstance(case_id, str) or not case_id.strip():
+            raise ValueError("每个案例都必须有有效的 id。")
+
+        if case_id in seen_ids:
+            raise ValueError(f"案例 ID 重复：{case_id}")
+        seen_ids.add(case_id)
+
+        if not isinstance(diff, str) or not diff.strip():
+            raise ValueError(f"案例 {case_id} 的 diff 不能为空。")
+
+        if not isinstance(expected_issue, bool):
+            raise ValueError(
+                f"案例 {case_id} 的 expected_issue 必须是 true 或 false。"
+            )
+
+    return cases
+
+
+def format_percent(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:.1%}"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="OpenHands CodeReview Agent 固定评测程序"
+    )
+    parser.add_argument(
+        "--dataset",
+        default=str(DEFAULT_DATASET),
+        help="评测集 JSON 路径",
+    )
+    parser.add_argument(
+        "--output",
+        default=str(DEFAULT_OUTPUT),
+        help="评测结果 JSON 输出路径",
+    )
+    parser.add_argument(
+        "--model",
+        default="deepseek-chat",
+        help="要评测的模型名称",
+    )
+    args = parser.parse_args()
+
+    try:
+        cases = load_dataset(Path(args.dataset))
+    except ValueError as exc:
+        print(f"评测集错误：{exc}", file=sys.stderr)
+        return 1
+
+    print(f"评测模型：{args.model}")
+    print(f"评测案例：{len(cases)}")
+    print("开始评测。每个案例都会发起一次模型调用。")
+    print("-" * 60)
+
+    reviewer = DeepSeekReviewer(model=args.model)
+    case_results = []
+
+    for index, case in enumerate(cases, start=1):
+        case_id = case["id"]
+        print(f"[{index}/{len(cases)}] {case_id} ... ", end="", flush=True)
+
+        started_at = time.perf_counter()
+
+        try:
+            review_result = reviewer.review(case["diff"])
+            validation = validate_review(case["diff"], review_result)
+        except ReviewError as exc:
+            print("失败")
+            print(f"  错误：{exc}", file=sys.stderr)
+            return 1
+
+        elapsed_seconds = time.perf_counter() - started_at
+
+        finding_count = review_result.finding_count
+        detected = finding_count > 0
+
+        expected_type = case.get("expected_issue_type", "no_issue")
+        valid_findings = validation.valid_findings
+        issue_type_match_count = sum(
+            finding.issue_type == expected_type
+            for finding in valid_findings
+        )
+
+        strict_detected = (
+            case["expected_issue"]
+            and issue_type_match_count > 0
+        )
+
+        item = {
+            "id": case_id,
+            "category": case.get("category", "unknown"),
+            "expected_issue": case["expected_issue"],
+            "expected_issue_type": expected_type,
+            "expected_issue_description": case.get(
+                "expected_issue_description", ""
+            ),
+            "detected": detected,
+            "strict_detected": strict_detected,
+            "issue_type_match_count": issue_type_match_count,
+            "case_outcome": (
+                "TP" if case["expected_issue"] and detected
+                else "FN" if case["expected_issue"] and not detected
+                else "FP" if not case["expected_issue"] and detected
+                else "TN"
+            ),
+            "finding_count": finding_count,
+            "valid_finding_count": len(validation.valid_findings),
+            "invalid_finding_count": len(validation.invalid_findings),
+            "summary": review_result.summary,
+            "findings": [
+                {
+                    "title": finding.title,
+                    "severity": finding.severity,
+                    "file_path": finding.file_path,
+                    "line": finding.line,
+                    "description": finding.description,
+                    "evidence": finding.evidence,
+                    "suggestion": finding.suggestion,
+                    "issue_type": finding.issue_type,
+                }
+                for finding in review_result.findings
+            ],
+            "invalid_findings": [
+                {
+                    "title": issue.finding.title,
+                    "file_path": issue.finding.file_path,
+                    "line": issue.finding.line,
+                    "reason": issue.reason,
+                    "issue_type": issue.finding.issue_type,
+                }
+                for issue in validation.invalid_findings
+            ],
+            "elapsed_seconds": round(elapsed_seconds, 3),
+        }
+
+        case_results.append(item)
+
+        print(
+            f"{item['case_outcome']} | "
+            f"发现 {finding_count} 条 | "
+            f"证据通过 {len(validation.valid_findings)} 条 | "
+            f"{elapsed_seconds:.1f}s"
+        )
+
+    metrics = calculate_metrics(case_results)
+
+    output = {
+        "model": args.model,
+        "dataset": str(Path(args.dataset).resolve()),
+        "metrics_definition": (
+            "TP/FN/FP/TN and strict_TP/strict_FN/strict_FP/strict_TN are "
+            "case-level metrics. Basic detection counts any finding. Strict "
+            "detection requires at least one valid finding with the expected "
+            "issue type. Strict recall is case-level. Strict precision is "
+            "finding-level: correctly typed valid findings from issue-positive "
+            "cases divided by all valid findings. Evidence pass rate is "
+            "valid findings divided by all findings."
+        ),
+        "metrics": metrics,
+        "cases": case_results,
+    }
+
+    output_path = Path(args.output).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(output, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    print("-" * 60)
+    print("评测完成")
+    print(f"案例数：{metrics['case_count']}")
+    print(
+        f"Recall（案例检出率）："
+        f"{format_percent(metrics['recall'])}"
+    )
+    print(
+        f"Precision（案例准确率）："
+        f"{format_percent(metrics['precision'])}"
+    )
+    print(
+        f"FPR（误报率）："
+        f"{format_percent(metrics['false_positive_rate'])}"
+    )
+    print(
+        f"Accuracy（案例准确率/分类正确率）："
+        f"{format_percent(metrics['accuracy'])}"
+    )
+    print(
+        f"Evidence Pass Rate（证据校验通过率）："
+        f"{format_percent(metrics['evidence_pass_rate'])}"
+    )
+    print(f"结果文件：{output_path}")
+
+    print(
+        "Strict Recall: "
+        + format_percent(metrics["strict_recall"])
+    )
+    print(
+        "Strict Precision: "
+        + format_percent(metrics["strict_precision"])
+    )
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

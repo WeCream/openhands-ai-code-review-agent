@@ -1,0 +1,76 @@
+{
+  "version": "1.0",
+  "description": "OpenHands CodeReview Agent 固定评测集第一版",
+  "cases": [
+    {
+      "id": "BUG-01",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "除法前没有检查除数是否为零",
+      "diff": "diff --git a/division.py b/division.py\n--- a/division.py\n+++ b/division.py\n@@ -0,0 +1,2 @@\n+def divide(a, b):\n+    return a / b\n"
+    },
+    {
+      "id": "BUG-02",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "直接按外部传入的索引访问列表，可能越界",
+      "diff": "diff --git a/items.py b/items.py\n--- a/items.py\n+++ b/items.py\n@@ -0,0 +1,5 @@\n+def get_item(items, index):\n+    return items[index]\n+\n+items = [\"apple\", \"banana\"]\n+print(get_item(items, 5))\n"
+    },
+    {
+      "id": "BUG-03",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "没有检查 user 是否为 None 就访问其属性",
+      "diff": "diff --git a/profile.py b/profile.py\n--- a/profile.py\n+++ b/profile.py\n@@ -0,0 +1,2 @@\n+def get_username(user):\n+    return user.name\n"
+    },
+    {
+      "id": "BUG-04",
+      "category": "bug",
+      "expected_issue": true,
+      "expected_issue_description": "打开文件后没有显式关闭资源",
+      "diff": "diff --git a/reader.py b/reader.py\n--- a/reader.py\n+++ b/reader.py\n@@ -0,0 +1,2 @@\n+def read_text(path):\n+    return open(path).read()\n"
+    },
+    {
+      "id": "SEC-01",
+      "category": "security",
+      "expected_issue": true,
+      "expected_issue_description": "将用户输入直接拼接到 SQL 语句中，存在 SQL 注入风险",
+      "diff": "diff --git a/users.py b/users.py\n--- a/users.py\n+++ b/users.py\n@@ -0,0 +1,2 @@\n+def find_user(cursor, username):\n+    cursor.execute(\"SELECT * FROM users WHERE name = '\" + username + \"'\")\n"
+    },
+    {
+      "id": "SEC-02",
+      "category": "security",
+      "expected_issue": true,
+      "expected_issue_description": "可能将敏感认证令牌写入日志",
+      "diff": "diff --git a/auth.py b/auth.py\n--- a/auth.py\n+++ b/auth.py\n@@ -0,0 +1,2 @@\n+def log_token(logger, token):\n+    logger.info(\"Login token: %s\", token)\n"
+    },
+    {
+      "id": "CLEAN-01",
+      "category": "clean",
+      "expected_issue": false,
+      "expected_issue_description": "仅将变量名称改为更清晰的名称，不应报告实质性问题",
+      "diff": "diff --git a/pricing.py b/pricing.py\n--- a/pricing.py\n+++ b/pricing.py\n@@ -1,2 +1,2 @@\n-def calc(p, q):\n-    return p * q\n+def calculate_price(price, quantity):\n+    return price * quantity\n"
+    },
+    {
+      "id": "CLEAN-02",
+      "category": "clean",
+      "expected_issue": false,
+      "expected_issue_description": "新增普通注释，不应报告实质性问题",
+      "diff": "diff --git a/math_utils.py b/math_utils.py\n--- a/math_utils.py\n+++ b/math_utils.py\n@@ -0,0 +1,3 @@\n+def add(a, b):\n+    # Return the sum of two numbers.\n+    return a + b\n"
+    },
+    {
+      "id": "EDGE-01",
+      "category": "edge",
+      "expected_issue": false,
+      "expected_issue_description": "只调整运算表达式的空格，不应报告实质性问题",
+      "diff": "diff --git a/calculate.py b/calculate.py\n--- a/calculate.py\n+++ b/calculate.py\n@@ -1 +1 @@\n-result=price*quantity\n+result = price * quantity\n"
+    },
+    {
+      "id": "EDGE-02",
+      "category": "edge",
+      "expected_issue": false,
+      "expected_issue_description": "已经显式检查除数为零，不应报告未处理除零的问题",
+      "diff": "diff --git a/safe_division.py b/safe_division.py\n--- a/safe_division.py\n+++ b/safe_division.py\n@@ -0,0 +1,4 @@\n+def divide(a, b):\n+    if b == 0:\n+        raise ValueError(\"b must not be zero\")\n+    return a / b\n"
+    }
+  ]
+}

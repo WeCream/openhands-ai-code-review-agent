@@ -1,0 +1,88 @@
+﻿
+import unittest
+from unittest.mock import patch
+
+from src.reviewer import DeepSeekReviewer
+from src.schemas import ReviewFinding, ReviewResult
+
+
+class TestReviewerIntegration(unittest.TestCase):
+    def setUp(self):
+        # 使用占位密钥即可；本测试不会发起真实 API 请求。
+        self.reviewer = DeepSeekReviewer(api_key="test-key")
+
+        self.diff = """diff --git a/example.py b/example.py
+--- a/example.py
++++ b/example.py
+@@ -0,0 +1,2 @@
++def divide(a, b):
++    return a / b
+"""
+
+        self.valid_finding = ReviewFinding(
+            title="Potential division by zero",
+            severity="low",
+            issue_type="division_by_zero",
+            file_path="example.py",
+            line=2,
+            description="The divisor may be zero.",
+            evidence="return a / b",
+            suggestion="Check whether b is zero.",
+        )
+
+        self.result = ReviewResult(
+            summary="One potential issue found.",
+            findings=[self.valid_finding],
+        )
+
+    def test_review_and_validate_accepts_valid_finding(self):
+        with patch.object(
+            self.reviewer,
+            "review",
+            return_value=self.result,
+        ):
+            result, validation = self.reviewer.review_and_validate(
+                self.diff
+            )
+
+        self.assertIs(result, self.result)
+        self.assertEqual(len(validation.valid_findings), 1)
+        self.assertEqual(len(validation.invalid_findings), 0)
+
+    def test_review_and_validate_rejects_invalid_finding(self):
+        invalid_finding = ReviewFinding(
+            title="Imaginary problem",
+            severity="low",
+            issue_type="division_by_zero",
+            file_path="example.py",
+            line=99,
+            description="This is a test finding.",
+            evidence="imaginary_code()",
+            suggestion="Fix the imaginary problem.",
+        )
+
+        invalid_result = ReviewResult(
+            summary="One finding to validate.",
+            findings=[invalid_finding],
+        )
+
+        with patch.object(
+            self.reviewer,
+            "review",
+            return_value=invalid_result,
+        ):
+            result, validation = self.reviewer.review_and_validate(
+                self.diff
+            )
+
+        self.assertEqual(len(validation.valid_findings), 0)
+        self.assertEqual(len(validation.invalid_findings), 1)
+        self.assertIn(
+            "not an added line",
+            validation.invalid_findings[0].reason,
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
+

@@ -1,0 +1,92 @@
+
+import unittest
+
+from src.diff_parser import parse_diff
+from src.evidence_validator import validate_finding, validate_review
+from src.schemas import ReviewFinding, ReviewResult
+
+
+SAMPLE_DIFF = """diff --git a/example.py b/example.py
+--- a/example.py
++++ b/example.py
+@@ -0,0 +1,3 @@
++def divide(a, b):
++    return a / b
++"""
+
+
+def make_finding(**overrides):
+    data = {
+        "title": "Potential division by zero",
+        "severity": "low",
+        "file_path": "example.py",
+        "line": 2,
+        "description": "The divisor may be zero.",
+        "evidence": "return a / b",
+        "suggestion": "Check whether b is zero.",
+        "issue_type": "division_by_zero",
+    }
+    data.update(overrides)
+    return ReviewFinding(**data)
+
+
+class TestEvidenceValidator(unittest.TestCase):
+    def setUp(self):
+        self.files = parse_diff(SAMPLE_DIFF)
+
+    def test_valid_finding(self):
+        finding = make_finding()
+        self.assertIsNone(validate_finding(finding, self.files))
+
+    def test_reject_unknown_file(self):
+        finding = make_finding(file_path="missing.py")
+        reason = validate_finding(finding, self.files)
+        self.assertIn("File not found", reason)
+
+    def test_reject_non_added_line(self):
+        finding = make_finding(line=99)
+        reason = validate_finding(finding, self.files)
+        self.assertIn("not an added line", reason)
+
+    def test_reject_mismatched_evidence(self):
+        finding = make_finding(evidence='password = "123456"')
+        reason = validate_finding(finding, self.files)
+        self.assertIn("Evidence does not match", reason)
+
+    
+
+
+    def test_review_separates_valid_and_invalid(self):
+        result = ReviewResult(
+            summary="Two findings to validate.",
+            findings=[
+                make_finding(),
+                make_finding(
+                    title="Fabricated finding",
+                    line=99,
+                    evidence="imaginary_code()",
+                ),
+            ],
+        )
+
+        validation = validate_review(SAMPLE_DIFF, result)
+
+        self.assertEqual(len(validation.valid_findings), 1)
+        self.assertEqual(len(validation.invalid_findings), 1)
+        self.assertFalse(validation.is_valid)
+
+    def test_empty_findings_are_valid(self):
+        result = ReviewResult(
+            summary="No actionable issues found.",
+            findings=[],
+        )
+
+        validation = validate_review(SAMPLE_DIFF, result)
+
+        self.assertEqual(validation.valid_findings, [])
+        self.assertEqual(validation.invalid_findings, [])
+        self.assertTrue(validation.is_valid)
+
+
+if __name__ == "__main__":
+    unittest.main()
