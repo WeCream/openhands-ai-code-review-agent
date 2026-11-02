@@ -1,11 +1,15 @@
-
 import json
 import os
+import sys
 import urllib.request
 from dataclasses import asdict
+from pathlib import Path
+
+# Add project root to Python import path.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.reviewer import DeepSeekReviewer
-
 
 def get_pr_diff() -> str:
     repository = os.environ["GITHUB_REPOSITORY"]
