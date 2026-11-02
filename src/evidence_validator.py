@@ -46,6 +46,37 @@ def _find_file(
 
     return None
 
+def locate_finding_line(
+    finding: ReviewFinding,
+    files: list[FileDiff],
+) -> int | None:
+    """根据证据内容定位唯一新增行，无法唯一定位时返回 None。"""
+
+    file_diff = _find_file(finding.file_path, files)
+
+    if file_diff is None:
+        return None
+
+    evidence = finding.evidence.strip()
+
+    if not evidence:
+        return None
+
+    matches = [
+        line.new_line
+        for line in file_diff.lines
+        if (
+            line.kind == "added"
+            and line.new_line is not None
+            and evidence in line.content
+        )
+    ]
+
+    # 只接受唯一匹配，防止把证据定位到错误行。
+    if len(matches) == 1:
+        return matches[0]
+
+    return None
 
 def validate_finding(
     finding: ReviewFinding,
@@ -112,6 +143,11 @@ def validate_review(
     invalid_findings: list[ValidationIssue] = []
 
     for finding in result.findings:
+        located_line = locate_finding_line(finding, files)
+
+        if located_line is not None:
+            finding.line = located_line
+
         reason = validate_finding(finding, files)
 
         if reason is None:

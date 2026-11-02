@@ -61,9 +61,13 @@ class DeepSeekReviewer:
 - 优先关注本次修改引入的问题。
 - 不要仅仅因为代码风格不同就报告问题。
 - finding 的 file_path 必须使用 Diff 中的文件路径。
-- line 必须是修改后文件中的行号，并且对应一个新增行。
-- evidence 必须是该新增行中实际存在的代码片段。
-- 不要将已删除的代码行当成当前代码来报告。
+- line must be the actual line number in the modified file and must refer to an added line.
+- Calculate line numbers from Git Diff @@ hunk headers. Never guess based on visual position.
+- For new-file line numbers: count added (+) lines and context lines; do not count removed (-) lines.
+- evidence must be an exact code snippet from the same added line identified by line.
+- Before returning each finding, verify that file_path, line, and evidence refer to the same added line.
+- If the exact line number or evidence cannot be determined, do not fabricate a finding.
+- Do not report deleted lines as current code.
 - 如果没有足够依据的问题，findings 返回空数组。
 - severity 只能是 critical、high、medium、low、info。
 - issue_type 必须且只能是以下值之一：
