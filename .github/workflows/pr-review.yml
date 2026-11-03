@@ -7,49 +7,12 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  # Run tests for every PR, including PRs from forks.
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: read
-
-    steps:
-      - name: Checkout PR code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install project and test dependency
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install pytest
-
-      - name: Run tests
-        run: python -m pytest tests -q
-
-  # Run AI review only for PRs from the same repository.
-  ai-review:
-    needs: test
-    if: >-
-      ${{
-        needs.test.result == 'success' &&
-        github.event.pull_request.head.repo.full_name == github.repository
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      pull-requests: write
 
     steps:
       - name: Checkout PR code
@@ -67,10 +30,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
-      - name: Run AI Code Review
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: python scripts/run_pr_review.py
+      - name: Install test dependency
+        run: pip install pytest
+
+      - name: Run tests
+        run: python -m pytest tests -q
