@@ -40,11 +40,7 @@ jobs:
   # Run AI review only for PRs from the same repository.
   ai-review:
     needs: test
-    if: >-
-      ${{
-        needs.test.result == 'success' &&
-        github.event.pull_request.head.repo.full_name == github.repository
-      }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
