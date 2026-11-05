@@ -116,6 +116,16 @@ JSON 格式如下：
         except OpenAIError as exc:
             raise ReviewError(f"调用模型 API 失败：{exc}") from exc
 
+        if response is None:
+            raise ReviewError(
+                "模型 API 返回了 None，未获得有效响应。"
+            )
+
+        if not response.choices:
+            raise ReviewError(
+                "模型 API 返回了空 choices。"
+            )
+
         content = response.choices[0].message.content
 
         if not content or not content.strip():
