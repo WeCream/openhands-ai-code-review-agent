@@ -1,12 +1,11 @@
+
 import json
 import os
+
 from openai import OpenAI, OpenAIError
 
 from src.schemas import ReviewFinding, ReviewResult
 from src.evidence_validator import ValidationResult, validate_review
-
-
-
 
 
 class ReviewError(RuntimeError):
@@ -31,17 +30,22 @@ class DeepSeekReviewer:
 
         if not resolved_api_key.strip():
             raise ReviewError(
-                "未配置 DeepSeek API Key。请设置 DEEPSEEK_API_KEY，"
-                "或填写 DEFAULT_API_KEY。"
+                "未配置 DeepSeek API Key。请设置 DEEPSEEK_API_KEY。"
             )
 
         self.model = model
-        self.client = OpenAI(
-            api_key=resolved_api_key,
-            base_url="https://api.deepseek.com",
-            timeout=timeout,
-            max_retries=2,
-        )
+
+        try:
+            self.client = OpenAI(
+                api_key=resolved_api_key,
+                base_url="https://api.deepseek.com",
+                timeout=timeout,
+                max_retries=2,
+            )
+        except OpenAIError as exc:
+            raise ReviewError(
+                f"初始化模型 API 客户端失败：{exc}"
+            ) from exc
 
     def review(self, diff_text: str) -> ReviewResult:
         """调用模型审查 Git Diff，返回结构化结果。"""
@@ -114,12 +118,37 @@ JSON 格式如下：
                 max_tokens=4000,
             )
         except OpenAIError as exc:
-            raise ReviewError(f"调用模型 API 失败：{exc}") from exc
+            raise ReviewError(
+                f"调用模型 API 失败：{type(exc).__name__}: {exc}"
+            ) from exc
 
-        content = response.choices[0].message.content
+        # 正常 SDK 调用应返回 Completion 对象；
+        # 如果返回 None，明确报告异常，而不是继续访问 choices。
+        if response is None:
+            raise ReviewError(
+                "模型 API 返回 None，未获得有效响应。"
+            )
 
-        if not content or not content.strip():
-            raise ReviewError("模型返回了空内容。")
+        choices = getattr(response, "choices", None)
+
+        if not choices:
+            raise ReviewError(
+                "模型 API 响应中没有 choices。"
+            )
+
+        message = getattr(choices[0], "message", None)
+
+        if message is None:
+            raise ReviewError(
+                "模型 API 响应中没有 message。"
+            )
+
+        content = getattr(message, "content", None)
+
+        if not isinstance(content, str) or not content.strip():
+            raise ReviewError(
+                "模型返回了空内容或非文本内容。"
+            )
 
         try:
             data = json.loads(content)
@@ -138,6 +167,7 @@ JSON 格式如下：
 
         result = self.review(diff_text)
         validation = validate_review(diff_text, result)
+
         return result, validation
 
     @staticmethod
@@ -145,16 +175,22 @@ JSON 格式如下：
         """将模型返回的 JSON 转换为项目内部的数据结构。"""
 
         if not isinstance(data, dict):
-            raise ReviewError("模型返回的 JSON 顶层必须是对象。")
+            raise ReviewError(
+                "模型返回的 JSON 顶层必须是对象。"
+            )
 
         summary = data.get("summary")
         findings_data = data.get("findings")
 
         if not isinstance(summary, str) or not summary.strip():
-            raise ReviewError("模型返回结果缺少有效的 summary。")
+            raise ReviewError(
+                "模型返回结果缺少有效的 summary。"
+            )
 
         if not isinstance(findings_data, list):
-            raise ReviewError("模型返回结果中的 findings 必须是数组。")
+            raise ReviewError(
+                "模型返回结果中的 findings 必须是数组。"
+            )
 
         findings: list[ReviewFinding] = []
 
@@ -176,8 +212,10 @@ JSON 格式如下：
                 )
 
             missing_fields = required_fields - item.keys()
+
             if missing_fields:
                 missing = ", ".join(sorted(missing_fields))
+
                 raise ReviewError(
                     f"第 {index + 1} 条 finding 缺少字段：{missing}"
                 )
@@ -206,4 +244,6 @@ JSON 格式如下：
                 findings=findings,
             )
         except (TypeError, ValueError) as exc:
-            raise ReviewError(f"审查结果格式不正确：{exc}") from exc
+            raise ReviewError(
+                f"审查结果格式不正确：{exc}"
+            ) from exc
