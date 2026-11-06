@@ -285,3 +285,6 @@ MVP 优先建立可靠的审查和验证闭环。自动修改代码会引入额�
 
 ### 3. Agent Final Review Report
 ![Final Review](demo/screenshots/03_agent_final_review.png)
+
+### 4. Agent Pytest Results
+![Pytest Results](demo/screenshots/04_pytest_results.png)
