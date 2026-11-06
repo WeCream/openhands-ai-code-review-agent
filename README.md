@@ -274,3 +274,17 @@ MVP 优先建立可靠的审查和验证闭环。自动修改代码会引入额�
 - 集成 GitHub Actions 自动化验证流程，支持代码变更后的测试与 AI Review。
 
 > 简历数字应随仓库最新测试和评估结果更新。避免将精选测试集结果表述为普遍准确率。
+
+## Demo
+
+### 1. OpenHands Agent Tool Calling
+![Agent Tool Calling](demo/screenshots/01_openhands_tool_call.png)
+
+### 2. SQL Injection Detection & Evidence Validation
+![Code Review Finding](demo/screenshots/02_sql_injection_and_validation.png)
+
+### 3. Agent Final Review Report
+![Final Review](demo/screenshots/03_agent_final_review.png)
+
+### 4. Automated Tests
+![Pytest Results](demo/screenshots/04_pytest_results.png)
