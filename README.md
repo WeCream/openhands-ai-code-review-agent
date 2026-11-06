@@ -204,3 +204,20 @@ Never commit API keys or secrets to the repository.
 └── README.md
 ```
 
+## Demo
+
+### 1. OpenHands Agent Tool Calling
+
+![OpenHands Agent Tool Calling](demo/screenshots/01_openhands_tool_call.png)
+
+### 2. SQL Injection Detection & Evidence Validation
+
+![SQL Injection Detection](demo/screenshots/02_sql_injection_and_validation.png)
+
+### 3. Agent Final Review Report
+
+![Agent Final Review](demo/screenshots/03_agent_final_review.png)
+
+### 4. Automated Tests
+
+![Pytest Results](demo/screenshots/04_pytest_results.png)
