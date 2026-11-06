@@ -3,5 +3,14 @@ name = "codereviewagent"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "openai>=3.35.1",
+    "openai>=2.20.0,<3.0.0",
+    "openhands-sdk",
+]
+
+[tool.uv.sources]
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "7dc715445c9808ce67d07711baeffaed137c86e0" }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
 ]

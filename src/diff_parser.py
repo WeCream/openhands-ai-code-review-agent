@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass, field
+from dataclasses import dataclass, field
 from typing import Literal
 import re
 
@@ -34,7 +34,7 @@ def parse_diff(diff_text: str) -> list[FileDiff]:
     old_line: int | None = None
     new_line: int | None = None
 
-    for line in diff_text.splitlines():
+    for line in diff_text.lstrip("\ufeff").splitlines():
         if line.startswith("diff --git "):
             current = FileDiff(old_path=None, new_path=None)
             files.append(current)
